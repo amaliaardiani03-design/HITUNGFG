@@ -1,0 +1,787 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hitung Finish Good</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: tiga tab (Hitung, Rekap, Master). Kolom tunggal di HP, dua kolom di layar lebar.
+   Bagian paling berani: kolom Lokasi dibuat seperti label rak gudang. */
+:root {
+  --bg: #EBEFF1;
+  --surface: #FFFFFF;
+  --surface-2: #F4F6F7;
+  --ink: #14232B;
+  --muted: #566871;
+  --line: #CFD7DC;
+  --accent: #0B6E5E;
+  --accent-ink: #FFFFFF;
+  --hi: #F2B705;
+  --hi-ink: #1A1400;
+  --ok: #1C7A3E;
+  --bad: #B3261E;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E171C; --surface: #16232A; --surface-2: #1C2D35; --ink: #E7EEF1; --muted: #93A4AD;
+    --line: #2B3C45; --accent: #3CC1A8; --accent-ink: #06211C; --hi: #F2C230; --hi-ink: #1A1400;
+    --ok: #6FD392; --bad: #FF9088; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E171C; --surface: #16232A; --surface-2: #1C2D35; --ink: #E7EEF1; --muted: #93A4AD;
+  --line: #2B3C45; --accent: #3CC1A8; --accent-ink: #06211C; --hi: #F2C230; --hi-ink: #1A1400;
+  --ok: #6FD392; --bad: #FF9088; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 15px/1.45 var(--sans);
+  padding-inline: 16px; padding-block: 0 48px;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.app { max-width: 1000px; margin-inline: auto; }
+
+/* header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding-block: 14px 0; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font: 600 20px/1.2 var(--sans); letter-spacing: -0.01em; }
+.pill { font: 500 12px/1 var(--mono); padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.pill[data-s="db"] { color: var(--ok); }
+.pill[data-s="err"] { color: var(--bad); }
+.tabs { display: flex; gap: 4px; margin-top: 12px; border-bottom: 2px solid var(--line); }
+.tabs button { background: none; border: 0; padding: 10px 14px; font-weight: 500; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -2px; display: flex; gap: 8px; align-items: center; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.badge { font: 600 11px/1 var(--mono); background: var(--surface); border: 1px solid var(--line); padding: 3px 6px; border-radius: 99px; color: var(--muted); }
+.badge:empty { display: none; }
+main { padding-block: 18px 0; }
+
+/* shared */
+h2 { font: 600 13px/1.2 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; position: relative; min-width: 0; }
+.field > label, .lbl { font: 500 12px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+input[type="text"], input[type="search"], select {
+  width: 100%; min-height: 46px; padding: 8px 12px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 6px;
+}
+input[type="search"] { -webkit-appearance: none; appearance: none; }
+input::placeholder { color: var(--muted); opacity: 0.8; }
+.mono { font-family: var(--mono); }
+.num { font-variant-numeric: tabular-nums; }
+.btn { min-height: 44px; padding: 8px 16px; border-radius: 6px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 500; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn.danger { color: var(--bad); border-color: var(--bad); background: transparent; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn.sm { min-height: 36px; padding: 4px 12px; font-size: 14px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.row > * { min-width: 0; }
+.grow { flex: 1 1 200px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* hitung */
+.hitung-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 860px) { .hitung-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; } }
+.rack { border: 2px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--surface); }
+.rack label { display: block; background: var(--hi); color: var(--hi-ink); font: 600 11px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; padding: 7px 12px; }
+.rack input { border: 0; border-radius: 0; font: 600 28px/1.2 var(--mono); min-height: 58px; padding: 10px 12px; text-transform: uppercase; background: transparent; }
+.rack input:focus-visible { outline-offset: -3px; }
+#sugg { position: absolute; top: 100%; left: 0; right: 0; z-index: 4; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--surface); border: 1.5px solid var(--ink); border-radius: 6px; max-height: 300px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+#sugg li button { width: 100%; text-align: left; background: none; border: 0; padding: 8px 10px; border-radius: 4px; display: grid; gap: 2px; }
+#sugg li button:hover, #sugg li button[aria-selected="true"] { background: var(--surface-2); }
+#sugg .c { font: 600 14px/1.2 var(--mono); }
+#sugg .n { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.picked { border: 1.5px dashed var(--accent); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; background: var(--surface-2); }
+.picked .c { font: 600 16px/1.2 var(--mono); }
+.picked .n { overflow-wrap: anywhere; }
+.qty-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 420px) { .qty-row { grid-template-columns: minmax(0, 1fr); } }
+.qtywrap { position: relative; }
+.qtywrap input { font: 600 24px/1.2 var(--mono); min-height: 56px; padding-right: 64px; text-align: right; }
+.qtywrap span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font: 500 13px/1 var(--mono); color: var(--muted); pointer-events: none; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.entry .c { font: 600 14px/1.2 var(--mono); }
+.entry .n { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.entry .q { font: 600 16px/1.2 var(--mono); text-align: right; }
+.entry .meta { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; justify-content: space-between; font: 500 12px/1.2 var(--mono); color: var(--muted); }
+.loc { background: var(--hi); color: var(--hi-ink); padding: 2px 7px; border-radius: 3px; font-weight: 600; }
+.x { background: none; border: 1px solid var(--line); border-radius: 4px; padding: 2px 8px; color: var(--muted); font-size: 12px; min-height: 28px; }
+.x:hover { color: var(--bad); border-color: var(--bad); }
+.empty { border: 1.5px dashed var(--line); border-radius: 8px; padding: 22px 18px; background: var(--surface); display: grid; gap: 10px; justify-items: start; }
+.empty strong { font-size: 16px; }
+
+/* rekap & master */
+.stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.stat { flex: 1 1 140px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 4px; }
+.stat b { font: 600 22px/1.1 var(--mono); }
+.stat span { font: 500 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; }
+th { text-align: left; font: 500 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.c { font: 600 13px/1.3 var(--mono); white-space: nowrap; }
+td.r, th.r { text-align: right; }
+td.q { font: 600 14px/1.3 var(--mono); text-align: right; white-space: nowrap; }
+td.zero { color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font: 500 12px/1 var(--mono); border: 1px solid var(--line); border-radius: 3px; padding: 3px 6px; background: var(--surface-2); white-space: nowrap; }
+.tag-warn { color: var(--bad); font: 500 12px/1.2 var(--mono); }
+.sect { margin-bottom: 22px; }
+.preview { margin-top: 14px; display: grid; gap: 12px; }
+.warnings { margin: 0; padding-left: 18px; color: var(--bad); font-size: 14px; }
+.radio { display: flex; gap: 8px; align-items: center; min-height: 36px; }
+.radio input { width: 18px; height: 18px; accent-color: var(--accent); }
+.note { font-size: 13px; color: var(--muted); }
+.addgrid { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.7fr) auto; align-items: end; }
+@media (max-width: 640px) { .addgrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .addgrid .name { grid-column: 1 / -1; } }
+
+#toast { position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); max-width: 460px; margin-inline: auto; background: var(--ink); color: var(--bg); border-radius: 6px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; justify-content: space-between; z-index: 20; box-shadow: 0 8px 28px rgba(0,0,0,.3); }
+#toast button { background: none; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 4px 10px; }
+@media (prefers-reduced-motion: no-preference) { #toast { animation: up .18s ease-out; } @keyframes up { from { transform: translateY(8px); opacity: 0; } } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Hitung Finish Good</h1>
+      <span id="sync" class="pill" data-s="wait">Menyambungkan…</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Bagian aplikasi">
+      <button role="tab" data-tab="hitung" aria-selected="true">Hitung</button>
+      <button role="tab" data-tab="rekap" aria-selected="false">Rekap <span class="badge" id="n-rekap"></span></button>
+      <button role="tab" data-tab="master" aria-selected="false">Master <span class="badge" id="n-master"></span></button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- HITUNG -->
+    <section id="p-hitung" role="tabpanel">
+      <div id="no-master" class="empty" hidden>
+        <strong>Master item belum ada</strong>
+        <span class="muted">Upload file Excel berisi Item Code, Item Name, dan Unit. Setelah itu item bisa dicari dan dihitung di sini.</span>
+        <button class="btn primary" type="button" data-goto="master">Isi master dari Excel</button>
+      </div>
+      <div class="hitung-grid" id="hitung-grid">
+        <form id="f-count" class="stack" autocomplete="off" novalidate>
+          <div class="rack">
+            <label for="loc">Lokasi</label>
+            <input id="loc" type="text" list="loc-list" placeholder="A-03-2" autocapitalize="characters" spellcheck="false">
+            <datalist id="loc-list"></datalist>
+          </div>
+          <div class="field">
+            <label for="code">Item</label>
+            <input id="code" type="search" placeholder="Scan atau ketik kode / nama item" autocapitalize="characters" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="sugg" aria-autocomplete="list">
+            <ul id="sugg" role="listbox" hidden></ul>
+          </div>
+          <div id="picked" class="picked" hidden></div>
+          <div class="qty-row">
+            <div class="field">
+              <label for="qty">Qty</label>
+              <div class="qtywrap"><input id="qty" type="text" inputmode="decimal" placeholder="0" autocomplete="off"><span id="unit-sfx"></span></div>
+            </div>
+            <div class="field">
+              <label for="by">Petugas (opsional)</label>
+              <input id="by" type="text" placeholder="Nama">
+            </div>
+          </div>
+          <button class="btn primary" type="submit" style="min-height:52px;font-size:16px">Simpan hitungan</button>
+          <div id="form-msg" class="small" style="color:var(--bad)" role="alert"></div>
+        </form>
+        <div>
+          <h2>Hitungan terakhir</h2>
+          <ul id="recent" class="list"></ul>
+          <p id="recent-empty" class="muted small">Belum ada hitungan. Pilih lokasi, cari item, isi qty, lalu simpan.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- REKAP -->
+    <section id="p-rekap" role="tabpanel" hidden>
+      <div class="stats" id="stats"></div>
+      <div class="row sect">
+        <input id="rq" class="grow" type="search" placeholder="Cari kode atau nama item" aria-label="Cari di rekap">
+        <select id="rf" aria-label="Filter status" style="width:auto;flex:0 0 auto">
+          <option value="all">Semua item</option>
+          <option value="done">Sudah dihitung</option>
+          <option value="todo">Belum dihitung</option>
+        </select>
+        <button class="btn primary" type="button" id="btn-export">Unduh Excel</button>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Item Code</th><th>Item Name</th><th class="r">Total</th><th>Unit</th><th>Per lokasi</th></tr></thead>
+        <tbody id="rekap-body"></tbody>
+      </table></div>
+      <p id="rekap-note" class="note"></p>
+      <div id="clear-zone" class="row sect" style="margin-top:18px"></div>
+    </section>
+
+    <!-- MASTER -->
+    <section id="p-master" role="tabpanel" hidden>
+      <div class="card sect">
+        <h2>Buat master dari Excel</h2>
+        <p class="note" style="margin:0 0 12px">File Excel (.xlsx, .xls) atau CSV dengan tiga kolom: Item Code, Item Name, Unit. Baris pertama berisi judul kolom.</p>
+        <div class="row">
+          <input id="file" type="file" accept=".xlsx,.xls,.csv" class="grow" aria-label="Pilih file Excel master">
+          <button class="btn" type="button" id="btn-template">Unduh template</button>
+        </div>
+        <div id="preview" class="preview" hidden></div>
+      </div>
+
+      <div class="card sect">
+        <h2>Tambah satu item</h2>
+        <form id="f-add" class="addgrid" autocomplete="off">
+          <div class="field"><label for="a-code">Item Code</label><input id="a-code" type="text" spellcheck="false"></div>
+          <div class="field name"><label for="a-name">Item Name</label><input id="a-name" type="text"></div>
+          <div class="field"><label for="a-unit">Unit</label><input id="a-unit" type="text" placeholder="PCS" spellcheck="false"></div>
+          <button class="btn" type="submit">Tambah</button>
+        </form>
+      </div>
+
+      <h2>Daftar master</h2>
+      <div class="row sect">
+        <input id="mq" class="grow" type="search" placeholder="Cari kode atau nama item" aria-label="Cari di master">
+        <div id="master-clear"></div>
+      </div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Item Code</th><th>Item Name</th><th>Unit</th><th></th></tr></thead>
+        <tbody id="master-body"></tbody>
+      </table></div>
+      <p id="master-note" class="note"></p>
+    </section>
+  </main>
+  <div id="toast" role="status" hidden></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var state = { master: [], entries: [], idx: new Map(), tab: 'hitung', selected: null, preview: null, confirmClear: false, confirmMaster: false, sync: 'wait', activeSugg: -1, suggItems: [] };
+  var store = null, dl = null;
+
+  /* ---------- util ---------- */
+  function el(tag, props) {
+    var e = document.createElement(tag);
+    if (props) Object.keys(props).forEach(function (k) {
+      var v = props[k];
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.indexOf('on') === 0) e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, '');
+      else if (v !== false && v != null) e.setAttribute(k, v);
+    });
+    for (var i = 2; i < arguments.length; i++) {
+      var kids = [].concat(arguments[i]);
+      kids.forEach(function (kid) {
+        if (kid == null || kid === false) return;
+        e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+      });
+    }
+    return e;
+  }
+  function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; }
+  function round(n) { return Math.round(n * 1e6) / 1e6; }
+  function fmt(n) { return Number.isInteger(n) ? n.toLocaleString('id-ID') : n.toLocaleString('id-ID', { maximumFractionDigits: 3 }); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function fmtTime(ts) { var d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function fmtFull(ts) { var d = new Date(ts); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); }
+  function stamp() { var d = new Date(); return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()); }
+  function normLoc(s) { return String(s || '').trim().replace(/\s+/g, ' ').toUpperCase(); }
+  function uid() { try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {} return Date.now().toString(36) + Math.random().toString(36).slice(2, 10); }
+  function parseQty(s) {
+    s = String(s || '').trim().replace(/\s/g, '');
+    if (s === '') return null;
+    if (s.indexOf(',') >= 0 && s.indexOf('.') < 0) s = s.replace(',', '.'); else s = s.replace(/,/g, '');
+    var n = Number(s);
+    return isFinite(n) && n >= 0 ? n : null;
+  }
+  var toastTimer;
+  function toast(msg, actionLabel, action) {
+    var t = $('#toast');
+    t.textContent = '';
+    t.append(el('span', { text: msg }));
+    if (actionLabel) t.append(el('button', { type: 'button', text: actionLabel, onclick: function () { t.hidden = true; action(); } }));
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, actionLabel ? 6000 : 3500);
+  }
+  function errText(e) { return (e && (e.message || e.code)) ? String(e.message || e.code) : 'terjadi kesalahan'; }
+  async function run(fn) { try { await fn(); return true; } catch (e) { toast('Gagal menyimpan: ' + errText(e)); return false; } }
+
+  /* ---------- state setters ---------- */
+  function setMaster(items) {
+    state.master = items;
+    state.idx = new Map(items.map(function (i) { return [i.code.toUpperCase(), i]; }));
+    if (state.selected && !state.idx.has(state.selected.code.toUpperCase())) state.selected = null;
+    renderAll();
+  }
+  function setEntries(list) {
+    state.entries = list.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+    renderAll();
+  }
+  function setSync(s) { state.sync = s; renderSync(); }
+
+  /* ---------- storage backends ---------- */
+  var CHUNK = 300;
+  function chunkItems(items) {
+    var out = [];
+    for (var i = 0; i < items.length; i += CHUNK) out.push(items.slice(i, i + CHUNK).map(function (it) { return [it.code, it.name, it.unit]; }));
+    return out;
+  }
+  function dbStore(db) {
+    var mc = db.collection('master'), cc = db.collection('counts'), cache = new Map();
+    function onErr(e) { setSync('err'); toast('Penyimpanan bersama bermasalah: ' + errText(e)); }
+    return {
+      kind: 'db',
+      start: function () {
+        mc.onSnapshot(function (s) {
+          var ds = s.docs.map(function (d) { return { id: d.id, data: d.data() }; })
+            .filter(function (x) { return x.data && Array.isArray(x.data.items); })
+            .sort(function (a, b) { return (a.data.n || 0) - (b.data.n || 0); });
+          cache.clear();
+          var items = [];
+          ds.forEach(function (d) {
+            cache.set(d.id, JSON.stringify(d.data.items));
+            d.data.items.forEach(function (r) { items.push({ code: String(r[0]), name: String(r[1] || ''), unit: String(r[2] || '') }); });
+          });
+          setMaster(items);
+        }, onErr);
+        cc.onSnapshot(function (s) {
+          setEntries(s.docs.filter(function (d) { return d.exists; }).map(function (d) {
+            var x = d.data();
+            return { id: d.id, code: String(x.code || ''), loc: String(x.loc || ''), qty: Number(x.qty) || 0, ts: Number(x.ts) || 0, by: String(x.by || '') };
+          }));
+        }, onErr);
+        setSync('db');
+      },
+      saveMaster: async function (items) {
+        var chunks = chunkItems(items), keep = new Set();
+        for (var i = 0; i < chunks.length; i++) {
+          var id = 'c' + String(i).padStart(4, '0');
+          keep.add(id);
+          if (cache.get(id) !== JSON.stringify(chunks[i])) await mc.doc(id).set({ n: i, items: chunks[i] });
+        }
+        var old = Array.from(cache.keys()).filter(function (k) { return !keep.has(k); });
+        for (var j = 0; j < old.length; j++) await mc.doc(old[j]).delete();
+        setMaster(items);
+      },
+      addEntry: function (e) { return cc.doc(e.id).set({ code: e.code, loc: e.loc, qty: e.qty, ts: e.ts, by: e.by }); },
+      delEntry: function (id) { return cc.doc(id).delete(); },
+      clearEntries: async function () {
+        var ids = state.entries.map(function (e) { return e.id; });
+        for (var i = 0; i < ids.length; i += 10) await Promise.all(ids.slice(i, i + 10).map(function (id) { return cc.doc(id).delete(); }));
+      }
+    };
+  }
+  function localStore() {
+    function load(k) { try { return JSON.parse(ls(k) || '[]') || []; } catch (e) { return []; } }
+    var entries = [];
+    return {
+      kind: 'local',
+      start: function () { entries = load('fg.entries'); setMaster(load('fg.master')); setEntries(entries); setSync('local'); },
+      saveMaster: async function (items) { ls('fg.master', JSON.stringify(items)); setMaster(items); },
+      addEntry: async function (e) { entries = [e].concat(entries); ls('fg.entries', JSON.stringify(entries)); setEntries(entries); },
+      delEntry: async function (id) { entries = entries.filter(function (x) { return x.id !== id; }); ls('fg.entries', JSON.stringify(entries)); setEntries(entries); },
+      clearEntries: async function () { entries = []; ls('fg.entries', '[]'); setEntries(entries); }
+    };
+  }
+
+  /* ---------- aggregate ---------- */
+  function aggregate() {
+    var m = new Map();
+    state.master.forEach(function (it) { m.set(it.code.toUpperCase(), { code: it.code, name: it.name, unit: it.unit, total: 0, locs: new Map(), n: 0, orphan: false }); });
+    state.entries.forEach(function (e) {
+      var k = e.code.toUpperCase(), a = m.get(k);
+      if (!a) { a = { code: e.code, name: '(tidak ada di master)', unit: '', total: 0, locs: new Map(), n: 0, orphan: true }; m.set(k, a); }
+      a.total = round(a.total + e.qty); a.n++;
+      a.locs.set(e.loc, round((a.locs.get(e.loc) || 0) + e.qty));
+    });
+    return Array.from(m.values()).sort(function (a, b) { return a.code.localeCompare(b.code, 'id', { numeric: true }); });
+  }
+
+  /* ---------- render ---------- */
+  function renderSync() {
+    var p = $('#sync');
+    p.dataset.s = state.sync;
+    p.textContent = { wait: 'Menyambungkan…', db: 'Tersimpan bersama', local: 'Hanya di perangkat ini', err: 'Sambungan bermasalah' }[state.sync];
+    p.title = state.sync === 'local' ? 'Data disimpan di browser ini. Unduh Excel secara berkala.' : '';
+  }
+  function setTab(t) {
+    state.tab = t;
+    document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === t)); });
+    ['hitung', 'rekap', 'master'].forEach(function (n) { $('#p-' + n).hidden = n !== t; });
+    if (t === 'hitung') setTimeout(function () { var l = $('#loc'); (l.value ? $('#code') : l).focus(); }, 0);
+  }
+  function renderAll() { renderHitung(); renderRekap(); renderMaster(); }
+
+  function tally(code) {
+    var q = 0, locs = new Set();
+    state.entries.forEach(function (e) { if (e.code.toUpperCase() === code.toUpperCase()) { q = round(q + e.qty); locs.add(e.loc); } });
+    return { q: q, n: locs.size };
+  }
+  function renderPicked() {
+    var box = $('#picked'), it = state.selected;
+    box.hidden = !it;
+    $('#unit-sfx').textContent = it ? it.unit : '';
+    if (!it) return;
+    var t = tally(it.code);
+    box.textContent = '';
+    box.append(
+      el('span', { class: 'c', text: it.code }),
+      el('span', { class: 'n', text: it.name }),
+      el('span', { class: 'small muted', text: t.n ? 'Sudah dihitung ' + fmt(t.q) + ' ' + it.unit + ' di ' + t.n + ' lokasi' : 'Belum ada hitungan untuk item ini' })
+    );
+  }
+  function renderHitung() {
+    var has = state.master.length > 0;
+    $('#no-master').hidden = has;
+    $('#hitung-grid').hidden = !has;
+    $('#n-master').textContent = has ? String(state.master.length) : '';
+    renderPicked();
+    var locs = Array.from(new Set(state.entries.map(function (e) { return e.loc; }))).sort();
+    var dlst = $('#loc-list'); dlst.textContent = '';
+    locs.forEach(function (l) { dlst.append(el('option', { value: l })); });
+    var ul = $('#recent'); ul.textContent = '';
+    var recent = state.entries.slice(0, 8);
+    $('#recent-empty').hidden = recent.length > 0;
+    recent.forEach(function (e) {
+      var it = state.idx.get(e.code.toUpperCase());
+      ul.append(el('li', { class: 'entry' },
+        el('div', null, el('div', { class: 'c', text: e.code }), el('div', { class: 'n', text: it ? it.name : '(tidak ada di master)' })),
+        el('div', { class: 'q num', text: fmt(e.qty) + (it && it.unit ? ' ' + it.unit : '') }),
+        el('div', { class: 'meta' },
+          el('span', null, el('span', { class: 'loc', text: e.loc }), ' ' + fmtTime(e.ts) + (e.by ? ' · ' + e.by : '')),
+          el('button', { class: 'x', type: 'button', text: 'Hapus', 'aria-label': 'Hapus hitungan ' + e.code + ' di ' + e.loc, onclick: function () { removeEntry(e); } })
+        )));
+    });
+  }
+
+  function renderRekap() {
+    var agg = aggregate();
+    var counted = agg.filter(function (a) { return a.n > 0 && !a.orphan; }).length;
+    var locSet = new Set(state.entries.map(function (e) { return e.loc; }));
+    $('#n-rekap').textContent = state.entries.length ? String(state.entries.length) : '';
+    var st = $('#stats'); st.textContent = '';
+    [[counted + ' / ' + state.master.length, 'Item terhitung'], [String(state.entries.length), 'Jumlah input'], [String(locSet.size), 'Lokasi terpakai']].forEach(function (s) {
+      st.append(el('div', { class: 'stat' }, el('b', { class: 'num', text: s[0] }), el('span', { text: s[1] })));
+    });
+    var q = $('#rq').value.trim().toLowerCase(), f = $('#rf').value;
+    var rows = agg.filter(function (a) {
+      if (f === 'done' && a.n === 0) return false;
+      if (f === 'todo' && a.n > 0) return false;
+      return !q || a.code.toLowerCase().indexOf(q) >= 0 || a.name.toLowerCase().indexOf(q) >= 0;
+    });
+    var body = $('#rekap-body'); body.textContent = '';
+    rows.slice(0, 300).forEach(function (a) {
+      var chips = el('div', { class: 'chips' });
+      Array.from(a.locs.entries()).sort(function (x, y) { return x[0].localeCompare(y[0], 'id', { numeric: true }); })
+        .forEach(function (p) { chips.append(el('span', { class: 'chip num', text: p[0] + ' × ' + fmt(p[1]) })); });
+      body.append(el('tr', null,
+        el('td', { class: 'c', text: a.code }),
+        el('td', null, a.name, a.orphan ? el('div', { class: 'tag-warn', text: 'Kode tidak ada di master' }) : null),
+        el('td', { class: 'q num' + (a.n ? '' : ' zero'), text: fmt(a.total) }),
+        el('td', { text: a.unit }),
+        el('td', null, a.n ? chips : el('span', { class: 'muted', text: 'Belum dihitung' }))));
+    });
+    if (!rows.length) body.append(el('tr', null, el('td', { colspan: 5, class: 'muted', text: agg.length ? 'Tidak ada item yang cocok.' : 'Belum ada data. Isi master dan mulai menghitung.' })));
+    $('#rekap-note').textContent = rows.length > 300 ? 'Menampilkan 300 dari ' + rows.length + ' item. Gunakan pencarian untuk mempersempit. File Excel memuat semua item.' : '';
+    $('#btn-export').disabled = (!state.master.length && !state.entries.length);
+    
+    var z = $('#clear-zone'); z.textContent = '';
+    if (state.entries.length) {
+      if (!state.confirmClear) z.append(el('button', { class: 'btn danger sm', type: 'button', text: 'Hapus semua hitungan', onclick: function () { state.confirmClear = true; renderRekap(); } }));
+      else z.append(
+        el('span', { class: 'small', text: 'Hapus ' + state.entries.length + ' input hitungan? Ini tidak bisa dibatalkan.' }),
+        el('button', { class: 'btn danger sm', type: 'button', text: 'Ya, hapus semua', onclick: clearAll }),
+        el('button', { class: 'btn sm', type: 'button', text: 'Batal', onclick: function () { state.confirmClear = false; renderRekap(); } }));
+    }
+  }
+
+  function renderMaster() {
+    var q = $('#mq').value.trim().toLowerCase();
+    var rows = state.master.filter(function (it) { return !q || it.code.toLowerCase().indexOf(q) >= 0 || it.name.toLowerCase().indexOf(q) >= 0; });
+    var body = $('#master-body'); body.textContent = '';
+    rows.slice(0, 200).forEach(function (it) {
+      body.append(el('tr', null,
+        el('td', { class: 'c', text: it.code }), el('td', { text: it.name }), el('td', { text: it.unit }),
+        el('td', { class: 'r' }, el('button', { class: 'x', type: 'button', text: 'Hapus', 'aria-label': 'Hapus item ' + it.code, onclick: function () { removeItem(it); } }))));
+    });
+    if (!rows.length) body.append(el('tr', null, el('td', { colspan: 4, class: 'muted', text: state.master.length ? 'Tidak ada item yang cocok.' : 'Master masih kosong. Upload file Excel di atas atau tambah item satu per satu.' })));
+    $('#master-note').textContent = rows.length > 200 ? 'Menampilkan 200 dari ' + rows.length + ' item. Gunakan pencarian untuk mempersempit.' : '';
+    var mc = $('#master-clear'); mc.textContent = '';
+    if (state.master.length) {
+      if (!state.confirmMaster) mc.append(el('button', { class: 'btn danger sm', type: 'button', text: 'Kosongkan master', onclick: function () { state.confirmMaster = true; renderMaster(); } }));
+      else mc.append(el('span', { class: 'row' },
+        el('span', { class: 'small', text: 'Hapus ' + state.master.length + ' item master?' }),
+        el('button', { class: 'btn danger sm', type: 'button', text: 'Ya, kosongkan', onclick: function () { state.confirmMaster = false; run(function () { return store.saveMaster([]); }); } }),
+        el('button', { class: 'btn sm', type: 'button', text: 'Batal', onclick: function () { state.confirmMaster = false; renderMaster(); } })));
+    }
+  }
+
+  /* ---------- hitung: cari item & simpan ---------- */
+  function matches(q) {
+    q = q.trim().toLowerCase();
+    if (!q) return [];
+    var starts = [], inc = [];
+    for (var i = 0; i < state.master.length && starts.length + inc.length < 60; i++) {
+      var it = state.master[i], c = it.code.toLowerCase();
+      if (c.indexOf(q) === 0) starts.push(it);
+      else if (c.indexOf(q) >= 0 || it.name.toLowerCase().indexOf(q) >= 0) inc.push(it);
+    }
+    return starts.concat(inc).slice(0, 8);
+  }
+  function showSugg() {
+    var ul = $('#sugg'), input = $('#code');
+    var list = state.selected ? [] : matches(input.value);
+    state.suggItems = list; state.activeSugg = list.length ? 0 : -1;
+    ul.textContent = '';
+    list.forEach(function (it, i) {
+      ul.append(el('li', { role: 'presentation' }, el('button', { type: 'button', role: 'option', 'aria-selected': String(i === 0), onmousedown: function (ev) { ev.preventDefault(); }, onclick: function () { pick(it); } },
+        el('span', { class: 'c', text: it.code }), el('span', { class: 'n', text: it.name + (it.unit ? ' · ' + it.unit : '') }))));
+    });
+    ul.hidden = !list.length;
+    input.setAttribute('aria-expanded', String(list.length > 0));
+  }
+  function moveSugg(d) {
+    var n = state.suggItems.length; if (!n) return;
+    state.activeSugg = (state.activeSugg + d + n) % n;
+    $('#sugg').querySelectorAll('button').forEach(function (b, i) { b.setAttribute('aria-selected', String(i === state.activeSugg)); if (i === state.activeSugg) b.scrollIntoView({ block: 'nearest' }); });
+  }
+  function pick(it) {
+    state.selected = it;
+    $('#code').value = it.code;
+    $('#sugg').hidden = true; $('#code').setAttribute('aria-expanded', 'false');
+    $('#form-msg').textContent = '';
+    renderPicked();
+    $('#qty').focus();
+  }
+  function resetItem() {
+    state.selected = null; $('#code').value = ''; $('#qty').value = '';
+    renderPicked(); $('#sugg').hidden = true;
+  }
+  async function submitCount(ev) {
+    ev.preventDefault();
+    var msg = $('#form-msg'); msg.textContent = '';
+    var loc = normLoc($('#loc').value), qty = parseQty($('#qty').value);
+    if (!loc) { msg.textContent = 'Isi lokasi dulu.'; $('#loc').focus(); return; }
+    if (!state.selected) { msg.textContent = 'Pilih item dari daftar master.'; $('#code').focus(); return; }
+    if (qty === null) { msg.textContent = 'Qty harus berupa angka, 0 atau lebih.'; $('#qty').focus(); return; }
+    var it = state.selected, by = $('#by').value.trim();
+    var e = { id: uid(), code: it.code, loc: loc, qty: qty, ts: Date.now(), by: by };
+    ls('fg.loc', loc); ls('fg.by', by);
+    $('#loc').value = loc;
+    var ok = await run(function () { return store.addEntry(e); });
+    if (!ok) return;
+    toast(it.code + ' · ' + fmt(qty) + ' ' + it.unit + ' di ' + loc + ' tersimpan');
+    resetItem();
+    $('#code').focus();
+  }
+  function removeEntry(e) {
+    run(function () { return store.delEntry(e.id); }).then(function (ok) {
+      if (ok) toast('Hitungan ' + e.code + ' di ' + e.loc + ' dihapus', 'Batalkan', function () { run(function () { return store.addEntry(e); }); });
+    });
+  }
+  async function clearAll() {
+    state.confirmClear = false;
+    var ok = await run(function () { return store.clearEntries(); });
+    if (ok) toast('Semua hitungan dihapus');
+    renderRekap();
+  }
+  function removeItem(it) {
+    var items = state.master.filter(function (x) { return x !== it; });
+    run(function () { return store.saveMaster(items); }).then(function (ok) { if (ok) toast('Item ' + it.code + ' dihapus dari master'); });
+  }
+
+  /* ---------- master dari Excel ---------- */
+  var CODE = ['itemcode', 'kodeitem', 'kodebarang', 'code', 'kode', 'sku', 'itemno', 'partno'];
+  var NAME = ['itemname', 'namaitem', 'namabarang', 'name', 'nama', 'description', 'deskripsi', 'itemdescription'];
+  var UNIT = ['unit', 'satuan', 'uom', 'uomcode'];
+  function nh(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+  function parseRows(rows) {
+    var hi = -1, cc = 0, nc = 1, uc = 2, warn = [];
+    for (var r = 0; r < Math.min(rows.length, 15); r++) {
+      var h = rows[r].map(nh), c = h.findIndex(function (x) { return CODE.indexOf(x) >= 0; });
+      if (c >= 0) {
+        hi = r; cc = c;
+        nc = h.findIndex(function (x) { return NAME.indexOf(x) >= 0; });
+        uc = h.findIndex(function (x) { return UNIT.indexOf(x) >= 0; });
+        break;
+      }
+    }
+    if (hi < 0) warn.push('Judul kolom Item Code tidak ditemukan. Kolom 1, 2, 3 dibaca sebagai Item Code, Item Name, Unit.');
+    else { if (nc < 0) warn.push('Kolom Item Name tidak ditemukan.'); if (uc < 0) warn.push('Kolom Unit tidak ditemukan.'); }
+    var map = new Map(), noCode = 0, dup = 0;
+    for (var i = hi + 1; i < rows.length; i++) {
+      var row = rows[i];
+      if (!row.some(function (v) { return String(v == null ? '' : v).trim() !== ''; })) continue;
+      var code = String(row[cc] == null ? '' : row[cc]).trim();
+      if (!code) { noCode++; continue; }
+      var item = { code: code, name: nc >= 0 ? String(row[nc] == null ? '' : row[nc]).trim() : '', unit: uc >= 0 ? String(row[uc] == null ? '' : row[uc]).trim() : '' };
+      if (map.has(code.toUpperCase())) dup++;
+      map.set(code.toUpperCase(), item);
+    }
+    if (noCode) warn.push(noCode + ' baris dilewati karena Item Code kosong.');
+    if (dup) warn.push(dup + ' baris dengan kode ganda digabung. Baris paling bawah dipakai.');
+    return { items: Array.from(map.values()), warn: warn };
+  }
+  async function onFile(ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    if (!window.XLSX) { toast('Pembaca Excel belum termuat. Muat ulang halaman.'); return; }
+    try {
+      var buf = await f.arrayBuffer();
+      var wb = XLSX.read(buf, { type: 'array' });
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      state.preview = parseRows(rows); state.preview.file = f.name;
+      renderPreview();
+    } catch (e) { state.preview = null; renderPreview(); toast('File tidak bisa dibaca. Pastikan formatnya .xlsx, .xls, atau .csv.'); }
+  }
+  function renderPreview() {
+    var box = $('#preview'), p = state.preview;
+    box.hidden = !p; box.textContent = '';
+    if (!p) return;
+    var tb = el('tbody');
+    p.items.slice(0, 5).forEach(function (it) { tb.append(el('tr', null, el('td', { class: 'c', text: it.code }), el('td', { text: it.name }), el('td', { text: it.unit }))); });
+    box.append(
+      el('div', null, el('b', { text: p.items.length + ' item' }), ' terbaca dari ', el('span', { class: 'mono', text: p.file })),
+      p.warn.length ? el('ul', { class: 'warnings' }, p.warn.map(function (w) { return el('li', { text: w }); })) : null,
+      p.items.length ? el('div', { class: 'tablewrap' }, el('table', { style: 'min-width:0' }, el('thead', null, el('tr', null, el('th', { text: 'Item Code' }), el('th', { text: 'Item Name' }), el('th', { text: 'Unit' }))), tb)) : null,
+      p.items.length > 5 ? el('div', { class: 'note', text: 'Contoh 5 baris pertama.' }) : null,
+      p.items.length ? el('div', null,
+        el('label', { class: 'radio' }, el('input', { type: 'radio', name: 'mode', value: 'replace', id: 'm-replace', checked: !state.master.length }), 'Ganti seluruh master'),
+        el('label', { class: 'radio' }, el('input', { type: 'radio', name: 'mode', value: 'merge', id: 'm-merge', checked: !!state.master.length }), 'Gabung dengan master yang ada (kode sama diperbarui)')) : null,
+      el('div', { class: 'row' },
+        p.items.length ? el('button', { class: 'btn primary', type: 'button', text: 'Simpan ke master', onclick: commitPreview }) : null,
+        el('button', { class: 'btn', type: 'button', text: 'Batal', onclick: function () { state.preview = null; $('#file').value = ''; renderPreview(); } }))
+    );
+  }
+  async function commitPreview() {
+    var p = state.preview; if (!p) return;
+    var merge = $('#m-merge') && $('#m-merge').checked, items;
+    if (merge) {
+      var map = new Map(state.master.map(function (i) { return [i.code.toUpperCase(), i]; }));
+      p.items.forEach(function (i) { map.set(i.code.toUpperCase(), i); });
+      items = Array.from(map.values());
+    } else items = p.items;
+    var btn = $('#preview .primary'); if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan…'; }
+    var ok = await run(function () { return store.saveMaster(items); });
+    if (btn) { btn.disabled = false; btn.textContent = 'Simpan ke master'; }
+    if (ok) { toast(items.length + ' item tersimpan di master'); state.preview = null; $('#file').value = ''; renderPreview(); }
+  }
+  async function addOne(ev) {
+    ev.preventDefault();
+    var code = $('#a-code').value.trim(), name = $('#a-name').value.trim(), unit = $('#a-unit').value.trim();
+    if (!code) { toast('Isi Item Code dulu.'); $('#a-code').focus(); return; }
+    var map = new Map(state.master.map(function (i) { return [i.code.toUpperCase(), i]; }));
+    map.set(code.toUpperCase(), { code: code, name: name, unit: unit });
+    var ok = await run(function () { return store.saveMaster(Array.from(map.values())); });
+    if (ok) { toast('Item ' + code + ' tersimpan'); $('#f-add').reset(); $('#a-code').focus(); }
+  }
+
+  /* ---------- unduh Excel ---------- */
+  async function saveXlsx(wb, name) {
+    try {
+      var out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      var blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (dl) {
+        var r = await dl.save({ filename: name, data: blob });
+        if (r && r.status === 'saved') toast(name + ' disimpan');
+      } else {
+        var url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        toast(name + ' diunduh');
+      }
+    } catch (e) { if (!e || e.code !== 'declined') toast('Unduhan gagal: ' + errText(e)); }
+  }
+  function sheet(rows, widths) { var ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = widths.map(function (w) { return { wch: w }; }); return ws; }
+  function exportResult() {
+    if (!window.XLSX) { toast('Pembaca Excel belum termuat. Muat ulang halaman.'); return; }
+    var agg = aggregate();
+    var rekap = [['Item Code', 'Item Name', 'Unit', 'Total Qty', 'Jumlah Lokasi', 'Rincian Lokasi']];
+    agg.forEach(function (a) {
+      var det = Array.from(a.locs.entries()).sort(function (x, y) { return x[0].localeCompare(y[0], 'id', { numeric: true }); }).map(function (p) { return p[0] + ': ' + p[1]; }).join('; ');
+      rekap.push([a.code, a.name, a.unit, a.total, a.locs.size, det]);
+    });
+    var detail = [['Item Code', 'Item Name', 'Unit', 'Lokasi', 'Qty', 'Waktu', 'Petugas']];
+    state.entries.slice().sort(function (a, b) { return a.code.localeCompare(b.code, 'id', { numeric: true }) || a.loc.localeCompare(b.loc, 'id', { numeric: true }) || a.ts - b.ts; })
+      .forEach(function (e) { var it = state.idx.get(e.code.toUpperCase()); detail.push([e.code, it ? it.name : '(tidak ada di master)', it ? it.unit : '', e.loc, e.qty, fmtFull(e.ts), e.by]); });
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet(rekap, [18, 40, 8, 12, 14, 50]), 'Rekap Item');
+    XLSX.utils.book_append_sheet(wb, sheet(detail, [18, 40, 8, 14, 10, 18, 16]), 'Detail Lokasi');
+    saveXlsx(wb, 'hitung-finish-good-' + stamp() + '.xlsx');
+  }
+  function exportTemplate() {
+    if (!window.XLSX) { toast('Pembaca Excel belum termuat. Muat ulang halaman.'); return; }
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet([['Item Code', 'Item Name', 'Unit'], ['CONTOH-001', 'Contoh nama barang A (hapus baris ini)', 'PCS'], ['CONTOH-002', 'Contoh nama barang B (hapus baris ini)', 'BOX']], [18, 44, 10]), 'Master');
+    saveXlsx(wb, 'template-master-finish-good.xlsx');
+  }
+
+  /* ---------- events ---------- */
+  document.querySelectorAll('.tabs button').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+  document.querySelectorAll('[data-goto]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.goto); }); });
+  $('#f-count').addEventListener('submit', submitCount);
+  var codeIn = $('#code');
+  codeIn.addEventListener('input', function () { if (state.selected && codeIn.value !== state.selected.code) { state.selected = null; renderPicked(); } showSugg(); });
+  codeIn.addEventListener('focus', function () { if (!state.selected) showSugg(); });
+  codeIn.addEventListener('blur', function () { setTimeout(function () { $('#sugg').hidden = true; codeIn.setAttribute('aria-expanded', 'false'); }, 120); });
+  codeIn.addEventListener('keydown', function (ev) {
+    if (ev.key === 'ArrowDown') { ev.preventDefault(); moveSugg(1); }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); moveSugg(-1); }
+    else if (ev.key === 'Escape') { $('#sugg').hidden = true; }
+    else if (ev.key === 'Enter') {
+      ev.preventDefault();
+      if (state.selected) { $('#qty').focus(); return; }
+      var exact = state.idx.get(codeIn.value.trim().toUpperCase());
+      if (exact) pick(exact);
+      else if (state.suggItems.length) pick(state.suggItems[Math.max(0, state.activeSugg)]);
+      else if (codeIn.value.trim()) $('#form-msg').textContent = 'Item "' + codeIn.value.trim() + '" tidak ada di master.';
+    }
+  });
+  $('#loc').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); $('#code').focus(); } });
+  $('#qty').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); $('#f-count').requestSubmit(); } });
+  $('#rq').addEventListener('input', renderRekap);
+  $('#rf').addEventListener('change', renderRekap);
+  $('#mq').addEventListener('input', renderMaster);
+  $('#btn-export').addEventListener('click', exportResult);
+  $('#btn-template').addEventListener('click', exportTemplate);
+  $('#file').addEventListener('change', onFile);
+  $('#f-add').addEventListener('submit', addOne);
+
+  /* ---------- boot ---------- */
+  async function boot() {
+    $('#loc').value = ls('fg.loc') || '';
+    $('#by').value = ls('fg.by') || '';
+    renderAll(); renderSync();
+    var db = null;
+    try {
+      if (window.claude && window.claude.use) {
+        dl = await window.claude.use('downloads');
+        db = await window.claude.use('db');
+      }
+    } catch (e) { db = null; }
+    store = db ? dbStore(db) : localStore();
+    store.start();
+    renderAll();
+    $('#loc').value ? $('#code').focus() : $('#loc').focus();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
